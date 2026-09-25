@@ -736,6 +736,7 @@ elif st.session_state.etat == "relations":
     # --- Liste des relations possibles --------------------------------------
     noms = [p["nom"] for p in st.session_state.participants]
     relations_possibles = [(e, r) for e in noms for r in noms if e != r]
+    numeros_relations = {relation: index + 1 for index, relation in enumerate(relations_possibles)}
     relation_textes = [f"{i+1}. {e} → {r}"
                                  for i, (e, r) in enumerate(relations_possibles)]
 
@@ -845,12 +846,16 @@ elif st.session_state.etat == "relations":
     st.subheader("Relations enregistrées")
     if st.session_state.relations_saisies:
         colonnes_ordonnees = [
-            "Émetteur", "Récepteur", "Date", "Début", "Fin", "Service",
+            "N° relation", "Émetteur", "Récepteur", "Date", "Début", "Fin", "Service",
             "P+", "P-", "I+", "I-", "C+", "C-",
             "Score Pic Positif", "Score Pic Négatif", "Score Net",
             "Vigilance", "Commentaire"
         ]
         df = pd.DataFrame(st.session_state.relations_saisies)
+        df.insert(0, "N° relation", [
+            numeros_relations.get((emetteur, recepteur), "?")
+            for emetteur, recepteur in zip(df["Émetteur"], df["Récepteur"])
+        ])
 
         for col in colonnes_ordonnees:
             if col not in df.columns:
@@ -862,6 +867,7 @@ elif st.session_state.etat == "relations":
         gb.configure_selection(selection_mode="multiple", use_checkbox=True)
 
         # Configuration des colonnes pour AgGrid
+        gb.configure_column("N° relation", header_name="N°", width=65, minWidth=65, maxWidth=75)
         gb.configure_column("Émetteur", header_name="Émetteur", wrapText=True, autoHeight=True, minWidth=100)
         gb.configure_column("Récepteur", header_name="Récepteur", wrapText=True, autoHeight=True, minWidth=100)
         gb.configure_column("Date", header_name="Date", wrapText=True, autoHeight=True, minWidth=80)
