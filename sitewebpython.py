@@ -596,7 +596,9 @@ elif st.session_state.etat == "participants":
             st.session_state.participant_a_modifier = index_to_modify.split(" (")[0]
             st.rerun()
 
-    if st.button("🗑️ Supprimer le participant", key="supprimer_participant_menu"):
+    if st.session_state.participants and st.button(
+        "🗑️ Supprimer le participant", key="supprimer_participant_menu"
+    ):
         if index_to_modify:
             participant_nom = index_to_modify.split(" (")[0]
             st.session_state.participants = [
