@@ -884,6 +884,17 @@ elif st.session_state.etat == "relations":
             numeros_relations.get((emetteur, recepteur), "?")
             for emetteur, recepteur in zip(df["Émetteur"], df["Récepteur"])
         ])
+        if recherche_relation:
+            masque_relations = df.apply(
+                lambda row: any(
+                    recherche_relation in str(row[column]).casefold()
+                    for column in ("Émetteur", "Récepteur")
+                ),
+                axis=1,
+            )
+            df = df.loc[masque_relations].copy()
+            if df.empty:
+                st.info("Aucune relation enregistrée ne correspond à cette personne.")
 
         for col in colonnes_ordonnees:
             if col not in df.columns:
