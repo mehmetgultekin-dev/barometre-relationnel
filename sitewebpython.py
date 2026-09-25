@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_local_storage import LocalStorage
 import pandas as pd
 import openpyxl
 import json
@@ -7,7 +8,12 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 import hashlib
 import io
 import zipfile
-from barometre_core import classer_relation, longueur_max_colonne, valider_donnees_projet
+from barometre_core import (
+    ProjetInvalide,
+    classer_relation,
+    longueur_max_colonne,
+    valider_donnees_projet,
+)
 
 # Récupération sécurisée depuis les secrets Streamlit
 USERNAME = st.secrets["auth"]["username"]
@@ -49,6 +55,22 @@ default_states = {
 for k, v in default_states.items():
     st.session_state.setdefault(k, v)
 
+AUTOSAVE_KEY = "barometre_relationnel_autosave_v1"
+local_storage = LocalStorage(key="barometre_local_storage_init")
+if not st.session_state.get("autosave_loaded", False):
+    saved_project = local_storage.getItem(AUTOSAVE_KEY)
+    if saved_project:
+        try:
+            restored_project = valider_donnees_projet(json.loads(saved_project))
+            st.session_state.participants = restored_project["participants"]
+            st.session_state.services = restored_project["services"]
+            st.session_state.relations_saisies = restored_project["relations_saisies"]
+            st.session_state.nombre_total_personnes = restored_project["nombre_total_personnes"]
+            st.session_state.etat = "relations" if restored_project["participants"] else "menu"
+        except (json.JSONDecodeError, TypeError, ProjetInvalide) as error:
+            st.warning(f"La sauvegarde automatique locale est invalide et n’a pas été chargée : {error}")
+    st.session_state.autosave_loaded = True
+
 # === UTILITAIRES D’IMPORT / EXPORT ===========================================
 def exporter_json_data() -> str:
     """Exporte les données actuelles de la session en une chaîne JSON."""
@@ -59,6 +81,22 @@ def exporter_json_data() -> str:
         "nombre_total_personnes": st.session_state.nombre_total_personnes,
     }
     return json.dumps(data, indent=4, ensure_ascii=False)
+
+
+def sauvegarder_projet_local() -> None:
+    try:
+        local_storage.setItem(
+            AUTOSAVE_KEY,
+            exporter_json_data(),
+            key="barometre_local_autosave_write",
+        )
+    except Exception as error:
+        st.warning(f"La sauvegarde automatique locale a échoué : {error}")
+
+
+def rerun_apres_sauvegarde() -> None:
+    sauvegarder_projet_local()
+    st.rerun()
 
 
 def exporter_excel_data() -> bytes:
@@ -529,13 +567,14 @@ def importer_json():
             st.session_state.nombre_total_personnes = projet["nombre_total_personnes"]
             st.success("Projet chargé avec succès !")
             st.session_state.etat = "relations"
-            st.rerun()
+            rerun_apres_sauvegarde()
         except Exception as e:
             st.error(f"Erreur lors du chargement du fichier JSON : {e}")
 
 
 # === TITRE PRINCIPAL =========================================================
 st.title("Baromètre Relationnel — Réalisé par Hatice Gultekin")
+st.caption("Sauvegarde automatique activée dans ce navigateur.")
 
 # === MENU PRINCIPAL ==========================================================
 if st.session_state.etat == "menu":
@@ -550,7 +589,7 @@ if st.session_state.etat == "menu":
             st.session_state.selected_relations = pd.DataFrame()
             st.session_state.nombre_total_personnes = 0
             st.session_state.etat = "participants"
-            st.rerun()
+            rerun_apres_sauvegarde()
     # Appel direct de importer_json() en dehors de la colonne pour optimiser le glisser-déposer
     importer_json()
 
@@ -577,7 +616,7 @@ elif st.session_state.etat == "participants":
                 st.session_state.participant_ajoute_message = (
                     f"Participant « {nom.strip()} » ajouté."
                 )
-                st.rerun()
+                rerun_apres_sauvegarde()
             else:
                 st.warning("Participant déjà ajouté.")
         else:
@@ -602,7 +641,7 @@ elif st.session_state.etat == "participants":
 
         if index_to_modify and st.button("✏️ Modifier le participant", key="modifier_participant_menu"):
             st.session_state.participant_a_modifier = index_to_modify.split(" (")[0]
-            st.rerun()
+            rerun_apres_sauvegarde()
 
     if st.session_state.participants and st.button(
         "🗑️ Supprimer le participant", key="supprimer_participant_menu"
@@ -617,7 +656,7 @@ elif st.session_state.etat == "participants":
                 if r["Émetteur"] != participant_nom and r["Récepteur"] != participant_nom
             ]
             st.success(f"Participant « {participant_nom} » et ses relations ont été supprimés.")
-            st.rerun()
+            rerun_apres_sauvegarde()
         else:
             st.warning("Veuillez sélectionner un participant à supprimer.")
 
@@ -642,13 +681,13 @@ elif st.session_state.etat == "participants":
                 data["service"] = new_service.strip()
                 st.success("Participant modifié avec succès.")
                 st.session_state.participant_a_modifier = None
-                st.rerun()
+                rerun_apres_sauvegarde()
 
     # Bouton suivant
     if len(st.session_state.participants) >= 2:
         if st.button("Passer à l'étape suivante"):
             st.session_state.etat = "relations"
-            st.rerun()
+            rerun_apres_sauvegarde()
     elif st.session_state.participants:
         st.info("Ajoutez au moins un autre participant pour continuer.")
 
@@ -676,7 +715,7 @@ elif st.session_state.etat == "relations":
         )
         if index_to_modify_rel and st.button("✏️ Modifier le participant", key="modifier_participant_relations"):
             st.session_state.participant_a_modifier = index_to_modify_rel.split(" (")[0]
-            st.rerun()
+            rerun_apres_sauvegarde()
 
         if st.button("🗑️ Supprimer le participant", key="supprimer_participant_menu"):
             if index_to_modify_rel:
@@ -689,7 +728,7 @@ elif st.session_state.etat == "relations":
                     if r["Émetteur"] != participant_nom and r["Récepteur"] != participant_nom
                 ]
                 st.success(f"Participant « {participant_nom} » et ses relations ont été supprimés.")
-                st.rerun()
+                rerun_apres_sauvegarde()
             else:
                 st.warning("Veuillez sélectionner un participant à supprimer.")
 
@@ -714,7 +753,7 @@ elif st.session_state.etat == "relations":
                 data["service"] = new_service.strip()
                 st.success("Participant modifié avec succès.")
                 st.session_state.participant_a_modifier = None
-                st.rerun()
+                rerun_apres_sauvegarde()
 
     # --- Ajout rapide d’un participant --------------------------------------
     with st.expander("➕ Ajouter un participant oublié"):
@@ -735,7 +774,7 @@ elif st.session_state.etat == "relations":
                          "service": service_rapide.strip()}
                     )
                     st.success("Participant ajouté avec succès.")
-                    st.rerun()
+                    rerun_apres_sauvegarde()
                 else:
                     st.warning("Ce participant existe déjà.")
             else:
@@ -860,7 +899,7 @@ elif st.session_state.etat == "relations":
                             "Commentaire": commentaire,
                         })
                         st.success("Relation enregistrée.")
-                        st.rerun()
+                        rerun_apres_sauvegarde()
             except Exception as e:
                 st.warning(f"Erreur lors de l'extraction des données de relation. Veuillez vérifier la sélection: {e}")
         else:
@@ -971,7 +1010,7 @@ elif st.session_state.etat == "relations":
                 
                 st.session_state.relations_saisies = new_relations_saisies
                 st.success("Relations sélectionnées supprimées.")
-                st.rerun()
+                rerun_apres_sauvegarde()
             else:
                 st.warning("Veuillez sélectionner des relations à supprimer.")
 
@@ -984,7 +1023,7 @@ elif st.session_state.etat == "relations":
     with col1:
         if st.button("Retour au menu principal"):
             st.session_state.etat = "menu"
-            st.rerun()
+            rerun_apres_sauvegarde()
     with col2:
         # Bouton d'exportation pour l'ensemble du projet au format ZIP
         download_zip_filename = f"barometre_projet_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
@@ -995,3 +1034,5 @@ elif st.session_state.etat == "relations":
             mime="application/zip",
             key="download_project_zip_button"
         )
+
+sauvegarder_projet_local()
