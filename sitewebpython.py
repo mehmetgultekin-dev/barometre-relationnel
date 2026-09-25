@@ -7,7 +7,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 import hashlib
 import io
 import zipfile
-from barometre_core import classer_relation, valider_donnees_projet
+from barometre_core import classer_relation, longueur_max_colonne, valider_donnees_projet
 
 # Récupération sécurisée depuis les secrets Streamlit
 USERNAME = st.secrets["auth"]["username"]
@@ -148,7 +148,7 @@ def exporter_excel_data() -> bytes:
         for col_idx, column_name in enumerate(colonnes_relations_excel):
             max_length = len(str(column_name))
             if not df_relations.empty:
-                max_length = max(max_length, df_relations[column_name].astype(str).apply(len).max())
+                max_length = max(max_length, longueur_max_colonne(df_relations[column_name]))
 
             adjusted_width = (max_length + 2)
             if column_name == "Commentaire":
@@ -213,7 +213,7 @@ def exporter_excel_data() -> bytes:
         for col_idx, column_name in enumerate(df_stats.columns):
             max_length = len(str(column_name))
             if not df_stats.empty:
-                max_length = max(max_length, df_stats[column_name].astype(str).apply(len).max())
+                max_length = max(max_length, longueur_max_colonne(df_stats[column_name]))
             
             adjusted_width = (max_length + 2)
             if column_name == "Type de relation":
@@ -251,7 +251,7 @@ def exporter_excel_data() -> bytes:
         for col_idx, column_name in enumerate(colonnes_relations_excel):
             max_length = len(str(column_name))
             if not df_unidirectional.empty:
-                max_length = max(max_length, df_unidirectional[column_name].astype(str).apply(len).max())
+                max_length = max(max_length, longueur_max_colonne(df_unidirectional[column_name]))
 
             adjusted_width = (max_length + 2)
             if column_name == "Commentaire":
@@ -343,7 +343,7 @@ def exporter_excel_data() -> bytes:
         for col_idx, column_name in enumerate(colonnes_negative_cross_excel):
             max_length = len(str(column_name))
             if not df_negative_cross.empty:
-                max_length = max(max_length, df_negative_cross[column_name].astype(str).apply(len).max())
+                max_length = max(max_length, longueur_max_colonne(df_negative_cross[column_name]))
 
             adjusted_width = (max_length + 2)
             if column_name == "Commentaire":
@@ -428,7 +428,7 @@ def exporter_excel_data() -> bytes:
         for col_idx, column_name in enumerate(colonnes_positive_cross_excel):
             max_length = len(str(column_name))
             if not df_positive_cross.empty:
-                max_length = max(max_length, df_positive_cross[column_name].astype(str).apply(len).max())
+                max_length = max(max_length, longueur_max_colonne(df_positive_cross[column_name]))
 
             adjusted_width = (max_length + 2)
             if column_name == "Commentaire":
@@ -482,7 +482,7 @@ def exporter_excel_data() -> bytes:
         for col_idx, column_name in enumerate(colonnes_recap_excel):
             max_length = len(str(column_name))
             if not df_recap.empty:
-                max_length = max(max_length, df_recap[column_name].astype(str).apply(len).max())
+                max_length = max(max_length, longueur_max_colonne(df_recap[column_name]))
 
             adjusted_width = (max_length + 2)
             if column_name == "Commentaire":

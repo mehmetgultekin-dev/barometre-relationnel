@@ -1,6 +1,11 @@
 import unittest
 
-from barometre_core import ProjetInvalide, classer_relation, valider_donnees_projet
+from barometre_core import (
+    ProjetInvalide,
+    classer_relation,
+    longueur_max_colonne,
+    valider_donnees_projet,
+)
 
 
 class ValiderDonneesProjetTests(unittest.TestCase):
@@ -73,6 +78,9 @@ class ValiderDonneesProjetTests(unittest.TestCase):
         for scores, vigilance in expected.items():
             with self.subTest(scores=scores):
                 self.assertEqual(classer_relation(*scores), vigilance)
+
+    def test_column_width_handles_missing_values(self):
+        self.assertEqual(longueur_max_colonne([None, "Unidirectionnelle", ""]), 17)
 
 
 if __name__ == "__main__":

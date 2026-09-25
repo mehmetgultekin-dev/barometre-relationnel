@@ -4,6 +4,10 @@
 INDICATORS = ("P+", "P-", "I+", "I-", "C+", "C-")
 
 
+def longueur_max_colonne(values) -> int:
+    return max((len(str(value)) for value in values), default=0)
+
+
 class ProjetInvalide(ValueError):
     """Raised when imported project data cannot be used safely."""
 
