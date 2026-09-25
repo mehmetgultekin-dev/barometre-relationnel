@@ -37,6 +37,7 @@ if not st.session_state.logged_in:
 default_states = {
     "etat": "menu",
     "participants": [],
+    "participant_ajoute_message": None,
     "services": [],
     "relations_saisies": [],
     "relation_a_modifier": None,
@@ -565,6 +566,7 @@ elif st.session_state.etat == "participants":
         ajouter = st.form_submit_button("Ajouter")
 
     if ajouter:
+        st.session_state.participant_ajoute_message = None
         if nom.strip() and nouveau_service.strip():
             if all(nom != p["nom"] for p in st.session_state.participants):
                 if nouveau_service not in st.session_state.services:
@@ -572,12 +574,18 @@ elif st.session_state.etat == "participants":
                 st.session_state.participants.append(
                     {"nom": nom.strip(), "service": nouveau_service.strip()}
                 )
-                st.success(f"Participant « {nom.strip()} » ajouté.")
+                st.session_state.participant_ajoute_message = (
+                    f"Participant « {nom.strip()} » ajouté."
+                )
                 st.rerun()
             else:
                 st.warning("Participant déjà ajouté.")
         else:
             st.warning("Veuillez saisir un nom ET un service valides.")
+
+    if st.session_state.participant_ajoute_message:
+        st.info(st.session_state.participant_ajoute_message)
+        st.session_state.participant_ajoute_message = None
 
     if not st.session_state.participants:
         st.info("Ajoutez au moins deux participants pour continuer.")
