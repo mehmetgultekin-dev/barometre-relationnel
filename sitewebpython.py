@@ -1,18 +1,13 @@
 import streamlit as st
 import pandas as pd
 import openpyxl
-import tempfile
-import os
 import json
 from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode, ColumnsAutoSizeMode
-from dotenv import load_dotenv
 import hashlib
 import io
 import zipfile
-
-import streamlit as st
-import hashlib
+from barometre_core import classer_relation, valider_donnees_projet
 
 # Récupération sécurisée depuis les secrets Streamlit
 USERNAME = st.secrets["auth"]["username"]
@@ -37,34 +32,6 @@ if not st.session_state.logged_in:
     st.stop()
 
 
-
-# === LOGIQUE MÉTIER ==========================================================
-class AnalyseRelationnelle:
-    """Classe utilitaire pour calculer la vigilance d’une relation."""
-    def __init__(self, relations_saisies):
-        self.relations = relations_saisies
-
-    @staticmethod
-    def classer_relation(p_plus: int, p_moins: int) -> str:
-        """
-        Classifie une relation en fonction des scores positifs (p_plus) et négatifs (p_moins).
-        Met à jour la logique pour "Positif pur" (3 P+) et introduit "Positif" (1 ou 2 P+),
-        ainsi que "Négatif pur" (3 P-) et "Négatif" (1 ou 2 P-).
-        """
-        if p_plus == 3 and p_moins == 0:
-            return "Positif pur" # Réservé aux trois pics positifs (P+, I+, C+)
-        elif p_plus == 0 and p_moins == 3:
-            return "Négatif pur" # Réservé aux trois pics négatifs (P-, I-, C-)
-        elif (p_plus == 1 or p_plus == 2) and p_moins == 0:
-            return "Positif" # Pour un ou deux pics positifs, sans négatif
-        elif p_plus == 0 and (p_moins == 1 or p_moins == 2):
-            return "Négatif" # Pour un ou deux pics négatifs, sans positif
-        elif p_plus > 0 and p_moins > 0 and p_plus > p_moins:
-            return "Mixte positif"
-        elif p_plus > 0 and p_moins > 0 and p_plus <= p_moins:
-            return "Mixte tendu"
-        # Si les deux sont à 0, ou des états invalides, classer comme "Aucune donnée"
-        return "Aucune donnée"
 
 # === INITIALISATION DES ÉTATS STREAMLIT ======================================
 default_states = {
@@ -495,12 +462,10 @@ def exporter_excel_data() -> bytes:
             df_temp_pos['Type de Récap'] = 'Positive Croisée'
             recap_dataframes.append(df_temp_pos)
         
-        df_recap = pd.DataFrame()
+        colonnes_recap_excel = colonnes_relations_excel + ["Type de Croisé", "Type de Récap"]
+        df_recap = pd.DataFrame(columns=colonnes_recap_excel)
         if recap_dataframes:
             df_recap = pd.concat(recap_dataframes, ignore_index=True)
-            
-            # Définir l'ordre complet des colonnes pour le récapitulatif
-            colonnes_recap_excel = colonnes_relations_excel + ["Type de Croisé", "Type de Récap"]
             
             # S'assurer que toutes les colonnes définies existent dans le DataFrame récapitulatif
             for col in colonnes_recap_excel:
@@ -556,10 +521,11 @@ def importer_json():
     if fichier is not None:
         try:
             contenu = json.load(fichier)
-            st.session_state.participants         = contenu.get("participants", [])
-            st.session_state.services             = contenu.get("services", [])
-            st.session_state.relations_saisies = contenu.get("relations_saisies", [])
-            st.session_state.nombre_total_personnes = contenu.get("nombre_total_personnes", 0)
+            projet = valider_donnees_projet(contenu)
+            st.session_state.participants = projet["participants"]
+            st.session_state.services = projet["services"]
+            st.session_state.relations_saisies = projet["relations_saisies"]
+            st.session_state.nombre_total_personnes = projet["nombre_total_personnes"]
             st.success("Projet chargé avec succès !")
             st.session_state.etat = "relations"
             st.rerun()
@@ -856,9 +822,7 @@ elif st.session_state.etat == "relations":
                                       for i in ["P+", "I+", "C+"])
                         p_moins = sum(indicateurs_values[i]
                                       for i in ["P-", "I-", "C-"])
-                        vigilance = AnalyseRelationnelle.classer_relation(
-                            p_plus, p_moins
-                        )
+                        vigilance = classer_relation(p_plus, p_moins)
 
                         st.session_state.relations_saisies.append({
                             "Émetteur": emetteur,
@@ -949,9 +913,14 @@ elif st.session_state.etat == "relations":
             """
         )
 
-        if grid_response['selected_rows'] is not None and not grid_response['selected_rows'].empty:
-            st.session_state.selected_relations = grid_response['selected_rows']
+        selected_rows = grid_response.get("selected_rows")
+        if isinstance(selected_rows, pd.DataFrame):
+            st.session_state.selected_relations = selected_rows
+        elif isinstance(selected_rows, list):
+            st.session_state.selected_relations = pd.DataFrame(selected_rows)
         else:
+            st.session_state.selected_relations = pd.DataFrame()
+        if st.session_state.selected_relations.empty:
             st.session_state.selected_relations = pd.DataFrame()
 
         if st.button("🗑️ Supprimer les relations sélectionnées", key="delete_selected_relations_button"):
