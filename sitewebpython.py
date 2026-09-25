@@ -648,26 +648,11 @@ elif st.session_state.etat == "participants":
 elif st.session_state.etat == "relations":
     st.subheader("Étape 2 : Saisie des relations")
 
-    # --- Saisie du nombre total de personnes à l'étape 2 ---
+    # Le total suit automatiquement les participants saisis à l'étape 1.
+    st.session_state.nombre_total_personnes = len(st.session_state.participants)
     st.markdown("---")
     st.markdown("### Nombre total de personnes concernées par l'analyse")
-    with st.form("form_saisie_total_personnes"):
-        current_total_personnes = st.session_state.nombre_total_personnes
-        total_personnes_input = st.number_input(
-            "Saisissez le nombre total de personnes (même celles non détaillées ci-dessous) :",
-            min_value=0,
-            value=current_total_personnes,
-            step=1,
-            key="total_personnes_input_etape2"
-        )
-        ajouter_total_personnes = st.form_submit_button("Enregistrer le nombre de personnes")
-
-    if ajouter_total_personnes:
-        if total_personnes_input > 0:
-            st.session_state.nombre_total_personnes = total_personnes_input
-            st.success(f"Nombre total de personnes enregistré : {total_personnes_input}")
-        else:
-            st.warning("Veuillez saisir un nombre valide (> 0) de personnes.")
+    st.write(f"{st.session_state.nombre_total_personnes} participant(s) enregistré(s) à l’étape 1")
     st.markdown("---")
 
 
