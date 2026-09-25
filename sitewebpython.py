@@ -745,33 +745,53 @@ elif st.session_state.etat == "relations":
     noms = [p["nom"] for p in st.session_state.participants]
     relations_possibles = [(e, r) for e in noms for r in noms if e != r]
     numeros_relations = {relation: index + 1 for index, relation in enumerate(relations_possibles)}
-    relation_textes = [f"{i+1}. {e} → {r}"
-                                 for i, (e, r) in enumerate(relations_possibles)]
+    recherche_relation = st.text_input(
+        "Rechercher une personne dans les relations :",
+        placeholder="Exemple : Bob",
+        key="recherche_relation_input",
+    ).strip().casefold()
+    relations_filtrees = [
+        relation for relation in relations_possibles
+        if not recherche_relation or any(
+            recherche_relation in nom.casefold() for nom in relation
+        )
+    ]
+    relation_textes = [
+        f"{numeros_relations[relation]}. {relation[0]} → {relation[1]}"
+        for relation in relations_filtrees
+    ]
 
     if relations_possibles:
-        current_selection_index = 0
-        if "relation_choisie_index" in st.session_state and st.session_state.relation_choisie_index < len(relation_textes):
-            current_selection_index = st.session_state.relation_choisie_index
-        elif relation_textes:
+        if relation_textes:
             current_selection_index = 0
+            selected_relation_index = st.session_state.get("relation_choisie_index")
+            if selected_relation_index is not None:
+                for index, relation in enumerate(relations_filtrees):
+                    if numeros_relations[relation] - 1 == selected_relation_index:
+                        current_selection_index = index
+                        break
+
+            if st.session_state.get("relation_choisie_select") not in relation_textes:
+                st.session_state.pop("relation_choisie_select", None)
+
+            relation_choisie = st.selectbox(
+                "Relation à enregistrer :",
+                relation_textes,
+                index=current_selection_index,
+                key="relation_choisie_select"
+            )
+
+            relation_par_texte = dict(zip(relation_textes, relations_filtrees))
+            relation_selectionnee = relation_par_texte[relation_choisie]
+            st.session_state.relation_choisie_index = numeros_relations[relation_selectionnee] - 1
         else:
-            current_selection_index = None
-
-        relation_choisie = st.selectbox(
-            "Relation à enregistrer :",
-            relation_textes,
-            index=current_selection_index,
-            key="relation_choisie_select"
-        )
-
-        if relation_choisie:
-            st.session_state.relation_choisie_index = relation_textes.index(relation_choisie)
+            relation_choisie = None
+            st.info("Aucune relation ne correspond à cette personne.")
 
 
         if relation_choisie:
             try:
-                _, rel_part = relation_choisie.split(". ", 1)
-                emetteur, recepteur = rel_part.split(" → ")
+                emetteur, recepteur = relation_selectionnee
                 service_emetteur = next(
                     (p["service"] for p in st.session_state.participants
                      if p["nom"] == emetteur), ""
